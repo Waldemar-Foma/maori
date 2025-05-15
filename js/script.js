@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const qrSection = document.querySelector('.qr-section');
     const progressBarFill = document.querySelector('.progress-bar-fill');
     const progressSteps = document.querySelectorAll('.progress-step');
+    const images = document.querySelectorAll('.image-placeholder');
+    let isMobile = window.innerWidth <= 900;
 
     const sectionObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -28,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', () => {
             const currentSection = btn.closest('.story-section');
             const nextSection = currentSection.nextElementSibling;
+            
             if (nextSection) {
                 nextSection.scrollIntoView({ 
                     behavior: 'smooth',
@@ -50,7 +53,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
                 progressSteps.forEach(step => {
-                    step.classList.toggle('active', parseInt(step.getAttribute('data-step')) === index + 1);
+                    step.classList.toggle('active', 
+                        parseInt(step.getAttribute('data-step')) === index + 1);
                 });
 
                 document.body.className = '';
@@ -64,33 +68,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    window.addEventListener('scroll', updateProgress);
-    window.addEventListener('resize', updateProgress);
-    updateProgress();
-
-    progressSteps.forEach(step => {
-        step.addEventListener('click', () => {
-            const targetSection = document.querySelector(`#section${step.getAttribute('data-step')}`);
-            if (targetSection) {
-                targetSection.scrollIntoView({ 
-                    behavior: 'smooth',
-                    block: 'start'
-                });
+    function handleMouseMove(e) {
+        if (isMobile) return;
+        
+        const mouseX = (e.clientX / window.innerWidth - 0.5) * 15;
+        const mouseY = (e.clientY / window.innerHeight - 0.5) * 10;
+        
+        images.forEach(img => {
+            if (isElementInViewport(img)) {
+                img.style.transform = `
+                    scale(1.02) 
+                    rotateY(${mouseX}deg) 
+                    rotateX(${-mouseY}deg)
+                `;
             }
         });
-    });
+    }
 
-    if (window.innerWidth > 900) {
-        document.addEventListener('mousemove', (e) => {
-            const images = document.querySelectorAll('.image-placeholder');
-            const mouseX = (e.clientX / window.innerWidth - 0.5) * 20;
-            const mouseY = (e.clientY / window.innerHeight - 0.5) * 10;
-            
-            images.forEach(img => {
-                if (isElementInViewport(img)) {
-                    img.style.transform = `scale(1.02) rotateY(${mouseX}deg) rotateX(${-mouseY}deg)`;
-                }
-            });
+    function handleDeviceOrientation(e) {
+        if (!isMobile) return;
+        
+        const beta = e.beta;
+        const gamma = e.gamma;
+        
+        const tiltX = gamma ? Math.max(-20, Math.min(20, gamma * 0.7)) : 0;
+        const tiltY = beta ? Math.max(-15, Math.min(15, (beta - 90) * 0.5)) : 0;
+        
+        images.forEach(img => {
+            if (isElementInViewport(img)) {
+                img.style.transform = `
+                    scale(1.02)
+                    rotateX(${tiltY}deg)
+                    rotateY(${tiltX}deg)
+                `;
+            }
         });
     }
 
@@ -103,4 +114,54 @@ document.addEventListener('DOMContentLoaded', function() {
             rect.right <= (window.innerWidth || document.documentElement.clientWidth)
         );
     }
+
+    progressSteps.forEach(step => {
+        step.addEventListener('click', () => {
+            const targetSection = document.querySelector(
+                `#section${step.getAttribute('data-step')}`);
+            if (targetSection) {
+                targetSection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    window.addEventListener('scroll', updateProgress);
+    window.addEventListener('resize', updateProgress);
+    updateProgress();
+
+    if (isMobile) {
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+        } else {
+            console.log('DeviceOrientation API не поддерживается');
+        }
+    } else {
+        document.addEventListener('mousemove', handleMouseMove);
+    }
+
+    window.addEventListener('resize', function() {
+        const newIsMobile = window.innerWidth <= 900;
+        if (isMobile !== newIsMobile) {
+            isMobile = newIsMobile;
+            
+            if (isMobile) {
+                document.removeEventListener('mousemove', handleMouseMove);
+                if (window.DeviceOrientationEvent) {
+                    window.addEventListener('deviceorientation', handleDeviceOrientation);
+                }
+            } else {
+                if (window.DeviceOrientationEvent) {
+                    window.removeEventListener('deviceorientation', handleDeviceOrientation);
+                }
+                document.addEventListener('mousemove', handleMouseMove);
+            }
+            
+            images.forEach(img => {
+                img.style.transform = 'scale(1)';
+            });
+        }
+    });
 });
